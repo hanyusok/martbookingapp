@@ -79,7 +79,7 @@ fun PatientsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun PatientItem(
     patient: Patient,

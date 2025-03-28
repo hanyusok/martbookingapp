@@ -2,6 +2,7 @@ package com.example.martbookingapp.data.model
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.LocalDateTime
 
@@ -14,6 +15,9 @@ import java.time.LocalDateTime
             childColumns = ["patientId"],
             onDelete = ForeignKey.CASCADE
         )
+    ],
+    indices = [
+        Index("patientId")
     ]
 )
 data class Appointment(

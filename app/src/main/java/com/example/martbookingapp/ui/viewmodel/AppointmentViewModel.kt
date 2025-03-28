@@ -172,7 +172,7 @@ class AppointmentViewModel @Inject constructor(
                 if (appointment == null) {
                     // If not found, load from repository
                     appointmentRepository.getAppointmentById(appointmentId)?.let { loadedAppointment ->
-                        _appointments.value = _appointments.value + loadedAppointment
+                        _appointments.value += loadedAppointment
                     }
                 }
             } finally {
