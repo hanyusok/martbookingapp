@@ -91,7 +91,7 @@ fun AppointmentsScreen(
                 title = { Text("Update Status") },
                 text = {
                     Column {
-                        AppointmentStatus.values().forEach { status ->
+                        AppointmentStatus.entries.forEach { status ->
                             ListItem(
                                 headlineContent = { Text(status.name) },
                                 modifier = Modifier.clickable {
@@ -112,7 +112,6 @@ fun AppointmentsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppointmentCard(
     appointment: Appointment,

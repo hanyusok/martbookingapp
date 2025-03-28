@@ -224,7 +224,7 @@ fun EditAppointmentScreen(
                             expanded = expanded,
                             onDismissRequest = { expanded = false }
                         ) {
-                            AppointmentType.values().forEach { type ->
+                            AppointmentType.entries.forEach { type ->
                                 DropdownMenuItem(
                                     text = { Text(type.name) },
                                     onClick = {
@@ -267,7 +267,7 @@ fun EditAppointmentScreen(
                             .fillMaxWidth()
                             .height(50.dp),
                         enabled = selectedPatient != null && selectedDate != null && 
-                                 selectedTime != null && selectedType != null && !isLoading
+                                 selectedTime != null && selectedType != null
                     ) {
                         Text("Update Appointment")
                     }
