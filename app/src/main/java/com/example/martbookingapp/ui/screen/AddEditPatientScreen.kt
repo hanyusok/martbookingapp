@@ -18,7 +18,7 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditPatientScreen(
-    patientId: Long? = null,
+    patientId: String? = null,
     viewModel: PatientViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
     onPatientSaved: () -> Unit
@@ -44,12 +44,7 @@ fun AddEditPatientScreen(
                 name = it.name
                 email = it.email
                 phone = it.phone
-                // Parse the date string to LocalDate
-                try {
-                    dateOfBirth = LocalDate.parse(it.dateOfBirth, DateTimeFormatter.ISO_LOCAL_DATE)
-                } catch (e: Exception) {
-                    // Handle invalid date format
-                }
+                dateOfBirth = it.dateOfBirth
                 address = it.address
                 medicalHistory = it.medicalHistory
             }
@@ -135,28 +130,40 @@ fun AddEditPatientScreen(
 
             Button(
                 onClick = {
-                    val patient = Patient(
-                        id = patientId ?: 0,
-                        name = name,
-                        email = email,
-                        phone = phone,
-                        dateOfBirth = dateOfBirth?.format(DateTimeFormatter.ISO_LOCAL_DATE) ?: "",
-                        address = address,
-                        medicalHistory = medicalHistory
-                    )
-                    if (patientId == null) {
-                        viewModel.addPatient(patient)
-                    } else {
-                        viewModel.updatePatient(patient)
+                    val birthDate = dateOfBirth
+                    if (birthDate != null) {
+                        if (patientId == null) {
+                            viewModel.createPatient(
+                                name = name,
+                                email = email,
+                                phone = phone,
+                                dateOfBirth = birthDate,
+                                address = address,
+                                medicalHistory = medicalHistory
+                            )
+                        } else {
+                            val patient = Patient(
+                                id = patientId,
+                                name = name,
+                                email = email,
+                                phone = phone,
+                                dateOfBirth = birthDate,
+                                address = address,
+                                medicalHistory = medicalHistory
+                            )
+                            viewModel.updatePatient(patient)
+                        }
+                        onPatientSaved()
                     }
-                    onPatientSaved()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                enabled = name.isNotBlank() && email.isNotBlank() && phone.isNotBlank() && dateOfBirth != null
+                enabled = name.isNotBlank() && email.isNotBlank() && 
+                         phone.isNotBlank() && dateOfBirth != null && 
+                         address.isNotBlank()
             ) {
-                Text(if (patientId == null) "Add Patient" else "Save Changes")
+                Text(if (patientId == null) "Add Patient" else "Update Patient")
             }
         }
 

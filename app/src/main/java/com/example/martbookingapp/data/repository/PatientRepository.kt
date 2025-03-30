@@ -10,13 +10,15 @@ class PatientRepository @Inject constructor(
 ) {
     fun getAllPatients(): Flow<List<Patient>> = patientDao.getAllPatients()
 
-    suspend fun getPatientById(patientId: Long): Patient? = patientDao.getPatientById(patientId)
+    suspend fun getPatientById(patientId: String): Patient? = patientDao.getPatientById(patientId)
 
-    suspend fun insertPatient(patient: Patient): Long = patientDao.insertPatient(patient)
+    suspend fun insertPatient(patient: Patient) = patientDao.insertPatient(patient)
 
     suspend fun updatePatient(patient: Patient) = patientDao.updatePatient(patient)
 
     suspend fun deletePatient(patient: Patient) = patientDao.deletePatient(patient)
 
     fun searchPatients(query: String): Flow<List<Patient>> = patientDao.searchPatients(query)
+
+    fun getPatientDao(): PatientDao = patientDao
 } 

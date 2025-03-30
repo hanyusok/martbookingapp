@@ -17,12 +17,12 @@ sealed class Screen(val route: String) {
     data object Appointments : Screen("appointments")
     data object AddAppointment : Screen("add_appointment")
     data object EditAppointment : Screen("edit_appointment/{appointmentId}") {
-        fun createRoute(appointmentId: Long) = "edit_appointment/$appointmentId"
+        fun createRoute(appointmentId: String) = "edit_appointment/$appointmentId"
     }
     data object Patients : Screen("patients")
     data object AddPatient : Screen("add_patient")
     data object EditPatient : Screen("edit_patient/{patientId}") {
-        fun createRoute(patientId: Long) = "edit_patient/$patientId"
+        fun createRoute(patientId: String) = "edit_patient/$patientId"
     }
 }
 
@@ -41,7 +41,7 @@ fun NavGraph(
                 onNavigateToAddAppointment = {
                     navController.navigate(Screen.AddAppointment.route)
                 },
-                onNavigateToEditAppointment = { appointmentId: Long ->
+                onNavigateToEditAppointment = { appointmentId: String ->
                     navController.navigate(Screen.EditAppointment.createRoute(appointmentId))
                 }
             )
@@ -62,13 +62,13 @@ fun NavGraph(
             route = Screen.EditAppointment.route,
             arguments = listOf(
                 navArgument("appointmentId") {
-                    type = NavType.LongType
+                    type = NavType.StringType
                     nullable = false
-                    defaultValue = 0L
+                    defaultValue = ""
                 }
             )
         ) {
-            val appointmentId = it.arguments?.getLong("appointmentId") ?: return@composable
+            val appointmentId = it.arguments?.getString("appointmentId") ?: return@composable
             EditAppointmentScreen(
                 appointmentId = appointmentId,
                 onNavigateBack = {
@@ -85,7 +85,7 @@ fun NavGraph(
                 onNavigateToAddPatient = {
                     navController.navigate(Screen.AddPatient.route)
                 },
-                onNavigateToEditPatient = { patientId: Long ->
+                onNavigateToEditPatient = { patientId: String ->
                     navController.navigate(Screen.EditPatient.createRoute(patientId))
                 }
             )
@@ -106,13 +106,13 @@ fun NavGraph(
             route = Screen.EditPatient.route,
             arguments = listOf(
                 navArgument("patientId") {
-                    type = NavType.LongType
+                    type = NavType.StringType
                     nullable = false
-                    defaultValue = 0L
+                    defaultValue = ""
                 }
             )
         ) {
-            val patientId = it.arguments?.getLong("patientId") ?: return@composable
+            val patientId = it.arguments?.getString("patientId") ?: return@composable
             AddEditPatientScreen(
                 patientId = patientId,
                 onNavigateBack = {

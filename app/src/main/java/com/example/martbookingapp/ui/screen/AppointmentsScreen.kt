@@ -22,9 +22,11 @@ import java.time.format.DateTimeFormatter
 fun AppointmentsScreen(
     viewModel: AppointmentViewModel = hiltViewModel(),
     onNavigateToAddAppointment: () -> Unit,
-    onNavigateToEditAppointment: (Long) -> Unit
+    onNavigateToEditAppointment: (String) -> Unit
 ) {
     val appointments by viewModel.appointments.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
     var showDeleteDialog by remember { mutableStateOf<Appointment?>(null) }
     var showStatusDialog by remember { mutableStateOf<Appointment?>(null) }
 
@@ -43,20 +45,68 @@ fun AppointmentsScreen(
             }
         }
     ) { paddingValues ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp)
         ) {
-            items(appointments) { appointment ->
-                AppointmentCard(
-                    appointment = appointment,
-                    onEditClick = { onNavigateToEditAppointment(appointment.id) },
-                    onDeleteClick = { showDeleteDialog = appointment },
-                    onStatusClick = { showStatusDialog = appointment }
-                )
+            when {
+                isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                error != null -> {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = error!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { viewModel.loadAppointments() }) {
+                            Text("Retry")
+                        }
+                    }
+                }
+                appointments.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No appointments found",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = onNavigateToAddAppointment) {
+                            Text("Add Appointment")
+                        }
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(appointments) { appointment ->
+                            AppointmentCard(
+                                appointment = appointment,
+                                onEditClick = { onNavigateToEditAppointment(appointment.id) },
+                                onDeleteClick = { showDeleteDialog = appointment },
+                                onStatusClick = { showStatusDialog = appointment }
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -160,11 +210,7 @@ private fun AppointmentCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Type: ${appointment.type.name}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = "Status: ${appointment.status.name}",
+                text = "Status: ${appointment.status}",
                 style = MaterialTheme.typography.bodyMedium
             )
             if (appointment.notes.isNotBlank()) {

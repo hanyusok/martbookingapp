@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.martbookingapp.data.serialization.LocalDateTimeSerializer
+import com.example.martbookingapp.data.serialization.TimestampSerializer
 import kotlinx.serialization.Serializable
 import java.time.LocalDateTime
 
@@ -24,14 +25,17 @@ import java.time.LocalDateTime
     ]
 )
 data class Appointment(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val patientId: Long,
+    @PrimaryKey
+    val id: String,
+    val patientId: String,
     @Serializable(with = LocalDateTimeSerializer::class)
     val dateTime: LocalDateTime,
-    val status: AppointmentStatus,
+    val status: String,
     val notes: String = "",
-    val type: AppointmentType
+    @Serializable(with = TimestampSerializer::class)
+    val createdAt: Long = System.currentTimeMillis(),
+    @Serializable(with = TimestampSerializer::class)
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Serializable

@@ -33,12 +33,10 @@ fun AddAppointmentScreen(
     var selectedPatient by remember { mutableStateOf<Patient?>(null) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     var selectedTime by remember { mutableStateOf<LocalTime?>(null) }
-    var selectedType by remember { mutableStateOf<AppointmentType?>(null) }
     var notes by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showPatientDialog by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
 
     val patients by patientViewModel.patients.collectAsState()
     val context = LocalContext.current
@@ -127,37 +125,6 @@ fun AddAppointmentScreen(
                 }
             )
 
-            // Appointment Type Selection
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = it }
-            ) {
-                OutlinedTextField(
-                    value = selectedType?.name ?: "",
-                    onValueChange = { },
-                    readOnly = true,
-                    label = { Text("Appointment Type") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
-                )
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    AppointmentType.entries.forEach { type ->
-                        DropdownMenuItem(
-                            text = { Text(type.name) },
-                            onClick = {
-                                selectedType = type
-                                expanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
             // Notes
             OutlinedTextField(
                 value = notes,
@@ -172,12 +139,11 @@ fun AddAppointmentScreen(
             // Create Button
             Button(
                 onClick = {
-                    if (selectedPatient != null && selectedDate != null && selectedTime != null && selectedType != null) {
+                    if (selectedPatient != null && selectedDate != null && selectedTime != null) {
                         val dateTime = LocalDateTime.of(selectedDate, selectedTime)
                         viewModel.createAppointment(
                             patientId = selectedPatient!!.id,
                             dateTime = dateTime,
-                            type = selectedType!!,
                             notes = notes
                         )
                         onAppointmentCreated()
@@ -187,7 +153,7 @@ fun AddAppointmentScreen(
                     .fillMaxWidth()
                     .height(50.dp),
                 enabled = selectedPatient != null && selectedDate != null && 
-                         selectedTime != null && selectedType != null
+                         selectedTime != null
             ) {
                 Text("Create Appointment")
             }

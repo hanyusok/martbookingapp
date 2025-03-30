@@ -5,10 +5,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.martbookingapp.data.model.Appointment
 import com.example.martbookingapp.data.model.Patient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Database(
     entities = [Patient::class, Appointment::class],
@@ -24,15 +26,6 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                // Create index on patientId column
-                database.execSQL(
-                    "CREATE INDEX IF NOT EXISTS index_appointments_patientId ON appointments(patientId)"
-                )
-            }
-        }
-
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -40,23 +33,12 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mart_booking_database"
                 )
-                .addMigrations(MIGRATION_1_2)
+                .addCallback(DatabaseCallback())
+                .fallbackToDestructiveMigration() // This will drop and recreate tables if schema changes
                 .build()
                 INSTANCE = instance
                 instance
             }
         }
-    }
-}
-
-class Converters {
-    @androidx.room.TypeConverter
-    fun fromTimestamp(value: Long?): java.time.LocalDateTime? {
-        return value?.let { java.time.LocalDateTime.ofEpochSecond(it, 0, java.time.ZoneOffset.UTC) }
-    }
-
-    @androidx.room.TypeConverter
-    fun dateToTimestamp(date: java.time.LocalDateTime?): Long? {
-        return date?.toEpochSecond(java.time.ZoneOffset.UTC)
     }
 } 

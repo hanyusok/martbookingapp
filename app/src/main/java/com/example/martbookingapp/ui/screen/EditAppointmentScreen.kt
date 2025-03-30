@@ -32,7 +32,7 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditAppointmentScreen(
-    appointmentId: Long,
+    appointmentId: String,
     viewModel: AppointmentViewModel = hiltViewModel(),
     patientViewModel: PatientViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
@@ -45,12 +45,10 @@ fun EditAppointmentScreen(
     var selectedPatient by remember { mutableStateOf<Patient?>(null) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     var selectedTime by remember { mutableStateOf<LocalTime?>(null) }
-    var selectedType by remember { mutableStateOf<AppointmentType?>(null) }
     var notes by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showPatientDialog by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
     var showErrorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var currentAppointment by remember { mutableStateOf<Appointment?>(null) }
@@ -77,7 +75,6 @@ fun EditAppointmentScreen(
                 currentAppointment = appointment
                 selectedDate = appointment.dateTime.toLocalDate()
                 selectedTime = appointment.dateTime.toLocalTime()
-                selectedType = appointment.type
                 notes = appointment.notes
                 // Find and set the patient
                 patients.find { patient -> patient.id == appointment.patientId }?.let { patient ->
@@ -205,37 +202,6 @@ fun EditAppointmentScreen(
                         }
                     )
 
-                    // Appointment Type Selection
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedType?.name ?: "",
-                            onValueChange = { },
-                            readOnly = true,
-                            label = { Text("Appointment Type") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            AppointmentType.entries.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type.name) },
-                                    onClick = {
-                                        selectedType = type
-                                        expanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
                     // Notes
                     OutlinedTextField(
                         value = notes,
@@ -250,13 +216,12 @@ fun EditAppointmentScreen(
                     // Update Button
                     Button(
                         onClick = {
-                            if (selectedPatient != null && selectedDate != null && selectedTime != null && selectedType != null) {
+                            if (selectedPatient != null && selectedDate != null && selectedTime != null) {
                                 val dateTime = LocalDateTime.of(selectedDate, selectedTime)
                                 currentAppointment?.let {
                                     viewModel.updateAppointment(
                                         appointment = it,
                                         dateTime = dateTime,
-                                        type = selectedType!!,
                                         notes = notes
                                     )
                                     onAppointmentUpdated()
@@ -267,7 +232,7 @@ fun EditAppointmentScreen(
                             .fillMaxWidth()
                             .height(50.dp),
                         enabled = selectedPatient != null && selectedDate != null && 
-                                 selectedTime != null && selectedType != null
+                                 selectedTime != null
                     ) {
                         Text("Update Appointment")
                     }

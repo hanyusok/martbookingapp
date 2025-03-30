@@ -1,13 +1,19 @@
 package com.example.martbookingapp.data.sync
 
+import android.util.Log
 import com.example.martbookingapp.data.local.AppointmentDao
 import com.example.martbookingapp.data.local.PatientDao
 import com.example.martbookingapp.data.remote.SupabaseDataSource
 import com.example.martbookingapp.data.model.Appointment
 import com.example.martbookingapp.data.model.Patient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,103 +23,105 @@ class SyncService @Inject constructor(
     private val appointmentDao: AppointmentDao,
     private val supabaseDataSource: SupabaseDataSource
 ) {
+    companion object {
+        private const val TAG = "SyncService"
+        private const val BATCH_SIZE = 50
+    }
+
+    private val syncScope = CoroutineScope(Dispatchers.IO)
+
     suspend fun syncAllData() {
-        syncPatients()
-        syncAppointments()
+        Log.d(TAG, "Starting full data sync")
+        try {
+            // Launch both sync operations in parallel
+            val patientsJob = syncScope.async { syncPatients() }
+            val appointmentsJob = syncScope.async { syncAppointments() }
+            
+            // Wait for both operations to complete
+            awaitAll(patientsJob, appointmentsJob)
+            Log.d(TAG, "Full data sync completed successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during full data sync", e)
+            throw e
+        }
     }
 
     private suspend fun syncPatients() {
+        Log.d(TAG, "Starting patient sync")
         try {
-            // Get local patients
-            val localPatients = patientDao.getAllPatients().first()
+            // Get local and remote patients in parallel
+            val localPatientsDeferred = syncScope.async { patientDao.getAllPatients().first() }
+            val remotePatientsDeferred = syncScope.async { supabaseDataSource.getRemotePatients() }
             
-            // Get remote patients
-            val remotePatients = supabaseDataSource.getRemotePatients()
+            val localPatients = localPatientsDeferred.await()
+            val remotePatients = remotePatientsDeferred.await()
             
-            // Merge and update local database
+            Log.d(TAG, "Found ${localPatients.size} local and ${remotePatients.size} remote patients")
+            
+            // Merge patients
             val mergedPatients = mergePatients(localPatients, remotePatients)
-            mergedPatients.forEach { patient ->
-                patientDao.insertPatient(patient) // Room's OnConflictStrategy.REPLACE will handle conflicts
+            
+            // Update local database in batches
+            mergedPatients.chunked(BATCH_SIZE).forEach { batch ->
+                patientDao.insertPatients(batch)
             }
             
-            // Sync back to remote
-            supabaseDataSource.syncPatients(mergedPatients)
+            // Sync back to remote in batches
+            mergedPatients.chunked(BATCH_SIZE).forEach { batch ->
+                supabaseDataSource.syncPatients(batch)
+            }
+            
+            Log.d(TAG, "Patient sync completed successfully")
         } catch (e: Exception) {
-            // Handle sync errors
-            e.printStackTrace()
+            Log.e(TAG, "Error during patient sync", e)
+            throw e
         }
     }
 
     private suspend fun syncAppointments() {
+        Log.d(TAG, "Starting appointment sync")
         try {
-            // Get local appointments
-            val localAppointments = appointmentDao.getAllAppointments().first()
+            // Get local and remote appointments in parallel
+            val localAppointmentsDeferred = syncScope.async { appointmentDao.getAllAppointments().first() }
+            val remoteAppointmentsDeferred = syncScope.async { supabaseDataSource.getRemoteAppointments() }
             
-            // Get remote appointments
-            val remoteAppointments = supabaseDataSource.getRemoteAppointments()
+            val localAppointments = localAppointmentsDeferred.await()
+            val remoteAppointments = remoteAppointmentsDeferred.await()
             
-            // Merge and update local database
+            Log.d(TAG, "Found ${localAppointments.size} local and ${remoteAppointments.size} remote appointments")
+            
+            // Merge appointments
             val mergedAppointments = mergeAppointments(localAppointments, remoteAppointments)
-            mergedAppointments.forEach { appointment ->
-                appointmentDao.insertAppointment(appointment) // Room's OnConflictStrategy.REPLACE will handle conflicts
+            
+            // Update local database in batches
+            mergedAppointments.chunked(BATCH_SIZE).forEach { batch ->
+                appointmentDao.insertAppointments(batch)
             }
             
-            // Sync back to remote
-            supabaseDataSource.syncAppointments(mergedAppointments)
+            // Sync back to remote in batches
+            mergedAppointments.chunked(BATCH_SIZE).forEach { batch ->
+                supabaseDataSource.syncAppointments(batch)
+            }
+            
+            Log.d(TAG, "Appointment sync completed successfully")
         } catch (e: Exception) {
-            // Handle sync errors
-            e.printStackTrace()
+            Log.e(TAG, "Error during appointment sync", e)
+            throw e
         }
     }
 
     private fun mergePatients(local: List<Patient>, remote: List<Patient>): List<Patient> {
-        val merged = mutableListOf<Patient>()
-        val remoteMap = remote.associateBy { it.id }
-        
-        // First, add all local patients
-        local.forEach { localPatient ->
-            val remotePatient = remoteMap[localPatient.id]
-            if (remotePatient != null) {
-                // If both exist, use the most recently updated version
-                merged.add(if (localPatient.id > remotePatient.id) localPatient else remotePatient)
-            } else {
-                merged.add(localPatient)
-            }
-        }
-        
-        // Then, add any remote patients that don't exist locally
-        remote.forEach { remotePatient ->
-            if (!merged.any { it.id == remotePatient.id }) {
-                merged.add(remotePatient)
-            }
-        }
-        
-        return merged
+        val merged = mutableMapOf<String, Patient>()
+        local.forEach { merged[it.id] = it }
+        remote.forEach { merged[it.id] = it }
+        return merged.values.toList()
     }
 
     private fun mergeAppointments(local: List<Appointment>, remote: List<Appointment>): List<Appointment> {
-        val merged = mutableListOf<Appointment>()
-        val remoteMap = remote.associateBy { it.id }
-        
-        // First, add all local appointments
-        local.forEach { localAppointment ->
-            val remoteAppointment = remoteMap[localAppointment.id]
-            if (remoteAppointment != null) {
-                // If both exist, use the most recently updated version
-                merged.add(if (localAppointment.id > remoteAppointment.id) localAppointment else remoteAppointment)
-            } else {
-                merged.add(localAppointment)
-            }
-        }
-        
-        // Then, add any remote appointments that don't exist locally
-        remote.forEach { remoteAppointment ->
-            if (!merged.any { it.id == remoteAppointment.id }) {
-                merged.add(remoteAppointment)
-            }
-        }
-        
-        return merged
+        val merged = mutableMapOf<String, Appointment>()
+        local.forEach { merged[it.id] = it }
+        remote.forEach { merged[it.id] = it }
+        return merged.values.toList()
     }
 
     // Subscribe to updates
@@ -122,14 +130,17 @@ class SyncService @Inject constructor(
             supabaseDataSource.subscribeToPatientChanges().collect { remotePatients ->
                 val localPatients = patientDao.getAllPatients().first()
                 val mergedPatients = mergePatients(localPatients, remotePatients)
-                mergedPatients.forEach { patient ->
-                    patientDao.insertPatient(patient) // Room's OnConflictStrategy.REPLACE will handle conflicts
+                
+                // Update in batches
+                mergedPatients.chunked(BATCH_SIZE).forEach { batch ->
+                    patientDao.insertPatients(batch)
                 }
+                
                 emit(mergedPatients)
             }
         } catch (e: Exception) {
-            // Handle subscription errors
-            e.printStackTrace()
+            Log.e(TAG, "Error in patient subscription", e)
+            throw e
         }
     }
 
@@ -138,14 +149,17 @@ class SyncService @Inject constructor(
             supabaseDataSource.subscribeToAppointmentChanges().collect { remoteAppointments ->
                 val localAppointments = appointmentDao.getAllAppointments().first()
                 val mergedAppointments = mergeAppointments(localAppointments, remoteAppointments)
-                mergedAppointments.forEach { appointment ->
-                    appointmentDao.insertAppointment(appointment) // Room's OnConflictStrategy.REPLACE will handle conflicts
+                
+                // Update in batches
+                mergedAppointments.chunked(BATCH_SIZE).forEach { batch ->
+                    appointmentDao.insertAppointments(batch)
                 }
+                
                 emit(mergedAppointments)
             }
         } catch (e: Exception) {
-            // Handle subscription errors
-            e.printStackTrace()
+            Log.e(TAG, "Error in appointment subscription", e)
+            throw e
         }
     }
 } 

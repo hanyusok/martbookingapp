@@ -4,19 +4,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.martbookingapp.data.model.Appointment
 import com.example.martbookingapp.data.model.AppointmentStatus
-import com.example.martbookingapp.data.model.AppointmentType
 import com.example.martbookingapp.data.repository.AppointmentRepository
+import com.example.martbookingapp.data.sync.SyncService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import javax.inject.Inject
 
 @HiltViewModel
 class AppointmentViewModel @Inject constructor(
-    private val appointmentRepository: AppointmentRepository
+    private val appointmentRepository: AppointmentRepository,
+    private val syncService: SyncService
 ) : ViewModel() {
 
     private val _appointments = MutableStateFlow<List<Appointment>>(emptyList())
@@ -31,17 +34,30 @@ class AppointmentViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _currentAppointment = MutableStateFlow<Appointment?>(null)
+    val currentAppointment: StateFlow<Appointment?> = _currentAppointment.asStateFlow()
+
     init {
         loadAppointments()
     }
 
-    private fun loadAppointments() {
+    fun loadAppointments() {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
-                appointmentRepository.getAllAppointments().collect { appointments ->
-                    _appointments.value = appointments
-                }
+                // Subscribe to sync updates which will handle both local and remote data
+                syncService.subscribeToAppointmentUpdates()
+                    .flowOn(Dispatchers.IO)
+                    .collect { appointments ->
+                        _appointments.value = appointments
+                    }
+            } catch (e: Exception) {
+                _error.value = "Failed to load appointments: ${e.message}"
+                _appointments.value = emptyList()
             } finally {
                 _isLoading.value = false
             }
@@ -65,13 +81,18 @@ class AppointmentViewModel @Inject constructor(
     private fun loadAppointmentsForDate(date: LocalDateTime) {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
                 val startOfDay = date.withHour(0).withMinute(0).withSecond(0)
                 val endOfDay = date.withHour(23).withMinute(59).withSecond(59)
                 appointmentRepository.getAppointmentsByDateRange(startOfDay, endOfDay)
+                    .flowOn(Dispatchers.IO)
                     .collect { appointments ->
                         _appointments.value = appointments
                     }
+            } catch (e: Exception) {
+                _error.value = "Failed to load appointments for date: ${e.message}"
+                _appointments.value = emptyList()
             } finally {
                 _isLoading.value = false
             }
@@ -81,11 +102,16 @@ class AppointmentViewModel @Inject constructor(
     private fun loadAppointmentsByStatus(status: AppointmentStatus) {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
-                appointmentRepository.getAppointmentsByStatus(status)
+                appointmentRepository.getAppointmentsByStatus(status.name)
+                    .flowOn(Dispatchers.IO)
                     .collect { appointments ->
                         _appointments.value = appointments
                     }
+            } catch (e: Exception) {
+                _error.value = "Failed to load appointments by status: ${e.message}"
+                _appointments.value = emptyList()
             } finally {
                 _isLoading.value = false
             }
@@ -93,55 +119,84 @@ class AppointmentViewModel @Inject constructor(
     }
 
     fun createAppointment(
-        patientId: Long,
+        patientId: String,
         dateTime: LocalDateTime,
-        type: AppointmentType,
         notes: String = ""
     ) {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
                 val appointment = Appointment(
+                    id = java.util.UUID.randomUUID().toString(),
                     patientId = patientId,
                     dateTime = dateTime,
-                    status = AppointmentStatus.SCHEDULED,
-                    type = type,
+                    status = AppointmentStatus.SCHEDULED.name,
                     notes = notes
                 )
                 appointmentRepository.insertAppointment(appointment)
+            } catch (e: Exception) {
+                _error.value = "Failed to create appointment: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    fun updateAppointmentStatus(appointment: Appointment, newStatus: AppointmentStatus) {
+    fun loadAppointmentById(appointmentId: String) {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
-                val updatedAppointment = appointment.copy(status = newStatus)
-                appointmentRepository.updateAppointment(updatedAppointment)
+                appointmentRepository.getAppointmentById(appointmentId)?.let { appointment ->
+                    _currentAppointment.value = appointment
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to load appointment: ${e.message}"
+                _currentAppointment.value = null
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun getAppointmentById(appointmentId: String): Appointment? {
+        return _appointments.value.find { it.id == appointmentId }
     }
 
     fun updateAppointment(
         appointment: Appointment,
         dateTime: LocalDateTime,
-        type: AppointmentType,
         notes: String
     ) {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
                 val updatedAppointment = appointment.copy(
                     dateTime = dateTime,
-                    type = type,
                     notes = notes
                 )
                 appointmentRepository.updateAppointment(updatedAppointment)
+            } catch (e: Exception) {
+                _error.value = "Failed to update appointment: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun updateAppointmentStatus(appointment: Appointment, status: AppointmentStatus) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                val updatedAppointment = appointment.copy(
+                    status = status.name
+                )
+                appointmentRepository.updateAppointment(updatedAppointment)
+            } catch (e: Exception) {
+                _error.value = "Failed to update appointment status: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
@@ -151,30 +206,11 @@ class AppointmentViewModel @Inject constructor(
     fun deleteAppointment(appointment: Appointment) {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             try {
                 appointmentRepository.deleteAppointment(appointment)
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    fun getAppointmentById(appointmentId: Long): Appointment? {
-        return _appointments.value.find { it.id == appointmentId }
-    }
-
-    fun loadAppointmentById(appointmentId: Long) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                // First try to find in current list
-                val appointment = _appointments.value.find { it.id == appointmentId }
-                if (appointment == null) {
-                    // If not found, load from repository
-                    appointmentRepository.getAppointmentById(appointmentId)?.let { loadedAppointment ->
-                        _appointments.value += loadedAppointment
-                    }
-                }
+            } catch (e: Exception) {
+                _error.value = "Failed to delete appointment: ${e.message}"
             } finally {
                 _isLoading.value = false
             }

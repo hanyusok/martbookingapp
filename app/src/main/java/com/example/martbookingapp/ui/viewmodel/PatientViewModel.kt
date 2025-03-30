@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.martbookingapp.data.model.Patient
 import com.example.martbookingapp.data.repository.PatientRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
@@ -28,23 +31,43 @@ class PatientViewModel @Inject constructor(
 
     private fun loadPatients() {
         viewModelScope.launch {
-            patientRepository.getAllPatients().collect { patients ->
-                _patients.value = patients
-            }
+            patientRepository.getAllPatients()
+                .flowOn(Dispatchers.IO)
+                .collect { patients ->
+                    _patients.value = patients
+                }
         }
     }
 
     fun searchPatients(query: String) {
         _searchQuery.value = query
         viewModelScope.launch {
-            patientRepository.searchPatients(query).collect { patients ->
-                _patients.value = patients
-            }
+            patientRepository.searchPatients(query)
+                .flowOn(Dispatchers.IO)
+                .collect { patients ->
+                    _patients.value = patients
+                }
         }
     }
 
-    fun addPatient(patient: Patient) {
+    fun createPatient(
+        name: String,
+        email: String,
+        phone: String,
+        dateOfBirth: LocalDate,
+        address: String,
+        medicalHistory: String = ""
+    ) {
         viewModelScope.launch {
+            val patient = Patient(
+                id = java.util.UUID.randomUUID().toString(),
+                name = name,
+                email = email,
+                phone = phone,
+                dateOfBirth = dateOfBirth,
+                address = address,
+                medicalHistory = medicalHistory
+            )
             patientRepository.insertPatient(patient)
         }
     }
@@ -59,5 +82,9 @@ class PatientViewModel @Inject constructor(
         viewModelScope.launch {
             patientRepository.deletePatient(patient)
         }
+    }
+
+    fun getPatientById(patientId: String): Patient? {
+        return _patients.value.find { it.id == patientId }
     }
 } 

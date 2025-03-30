@@ -19,7 +19,7 @@ import com.example.martbookingapp.ui.viewmodel.PatientViewModel
 fun PatientsScreen(
     viewModel: PatientViewModel = hiltViewModel(),
     onNavigateToAddPatient: () -> Unit,
-    onNavigateToEditPatient: (Long) -> Unit
+    onNavigateToEditPatient: (String) -> Unit
 ) {
     val patients by viewModel.patients.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()

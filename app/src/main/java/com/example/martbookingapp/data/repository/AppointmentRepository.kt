@@ -12,16 +12,16 @@ class AppointmentRepository @Inject constructor(
 ) {
     fun getAllAppointments(): Flow<List<Appointment>> = appointmentDao.getAllAppointments()
 
-    fun getAppointmentsByPatient(patientId: Long): Flow<List<Appointment>> =
+    fun getAppointmentsByPatient(patientId: String): Flow<List<Appointment>> =
         appointmentDao.getAppointmentsByPatient(patientId)
 
     fun getAppointmentsByDateRange(startDate: LocalDateTime, endDate: LocalDateTime): Flow<List<Appointment>> =
         appointmentDao.getAppointmentsByDateRange(startDate, endDate)
 
-    fun getAppointmentsByStatus(status: AppointmentStatus): Flow<List<Appointment>> =
+    fun getAppointmentsByStatus(status: String): Flow<List<Appointment>> =
         appointmentDao.getAppointmentsByStatus(status)
 
-    suspend fun insertAppointment(appointment: Appointment): Long =
+    suspend fun insertAppointment(appointment: Appointment) =
         appointmentDao.insertAppointment(appointment)
 
     suspend fun updateAppointment(appointment: Appointment) =
@@ -30,13 +30,15 @@ class AppointmentRepository @Inject constructor(
     suspend fun deleteAppointment(appointment: Appointment) =
         appointmentDao.deleteAppointment(appointment)
 
-    suspend fun getAppointmentById(appointmentId: Long): Appointment? =
+    suspend fun getAppointmentById(appointmentId: String): Appointment? =
         appointmentDao.getAppointmentById(appointmentId)
 
     fun getAppointmentsByDateAndStatus(
         startDate: LocalDateTime,
         endDate: LocalDateTime,
-        status: AppointmentStatus
+        status: String
     ): Flow<List<Appointment>> =
         appointmentDao.getAppointmentsByDateAndStatus(startDate, endDate, status)
+
+    fun getAppointmentDao(): AppointmentDao = appointmentDao
 } 
